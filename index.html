@@ -1,0 +1,365 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Японский разговорник</title>
+<style>
+:root{
+  --bg:#f6f4ef;--card:#fff;--ink:#1d1c1a;--muted:#6b6760;--line:#e4e0d8;
+  --accent:#b8322a;--accent-ink:#fff;--ok:#2f7d4f;--mid:#b07a12;--bad:#b8322a;
+  --chip:#efebe3;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141312;--card:#1e1d1b;--ink:#efece6;--muted:#a19c93;--line:#33312d;
+  --accent:#e0564c;--accent-ink:#141312;--ok:#5fbf86;--mid:#e0ad45;--bad:#e0564c;--chip:#2a2825;
+}}
+:root[data-theme="dark"]{
+  --bg:#141312;--card:#1e1d1b;--ink:#efece6;--muted:#a19c93;--line:#33312d;
+  --accent:#e0564c;--accent-ink:#141312;--ok:#5fbf86;--mid:#e0ad45;--bad:#e0564c;--chip:#2a2825;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Hiragino Sans","Noto Sans JP",sans-serif}
+.wrap{max-width:640px;margin:0 auto;padding:16px 16px 80px}
+header h1{font-size:22px;margin:4px 0 2px}
+header p{margin:0;color:var(--muted);font-size:14px}
+.tabs{display:flex;gap:8px;margin:16px 0;overflow-x:auto}
+.tab{border:1px solid var(--line);background:var(--card);color:var(--ink);padding:8px 14px;border-radius:999px;font-size:14px;white-space:nowrap;cursor:pointer}
+.tab[aria-selected="true"]{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.warn{background:var(--chip);border-radius:12px;padding:10px 12px;font-size:14px;color:var(--muted);margin-bottom:12px}
+.section-title{font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:22px 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:10px}
+.jp{font-size:24px;line-height:1.3;font-family:"Hiragino Sans","Noto Sans JP","Yu Gothic",sans-serif}
+.kana{color:var(--muted);font-size:14px}
+.rd{font-size:15px;margin-top:4px}
+.rd b{font-weight:600}
+.meaning{margin-top:6px}
+.note{margin-top:6px;font-size:13px;color:var(--muted)}
+.row{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center}
+button.btn{border:1px solid var(--line);background:var(--chip);color:var(--ink);border-radius:10px;padding:9px 12px;font-size:15px;cursor:pointer}
+button.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+button.btn.rec{animation:pulse 1s infinite}
+button.btn:disabled{opacity:.5;cursor:default}
+@keyframes pulse{50%{opacity:.55}}
+.best{margin-left:auto;font-size:13px;color:var(--muted)}
+.result{margin-top:10px;font-size:14px;border-left:3px solid var(--line);padding-left:10px}
+.result.ok{border-color:var(--ok)}.result.mid{border-color:var(--mid)}.result.bad{border-color:var(--bad)}
+.score{font-weight:700}
+.result.ok .score{color:var(--ok)}.result.mid .score{color:var(--mid)}.result.bad .score{color:var(--bad)}
+.opts{display:grid;gap:8px;margin-top:12px}
+.opt{text-align:left;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:10px 12px;font-size:15px;cursor:pointer}
+.opt.right{border-color:var(--ok);color:var(--ok)}.opt.wrong{border-color:var(--bad);color:var(--bad)}
+.settings{display:flex;gap:14px;flex-wrap:wrap;font-size:14px;color:var(--muted);margin-top:10px}
+.settings label{display:flex;gap:6px;align-items:center;cursor:pointer}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Японский разговорник</h1>
+    <p>Сценарий: первый визит в happening bar. Слушай → повторяй → смотри, что распознал японский микрофон.</p>
+  </header>
+
+  <div class="settings">
+    <label><input type="checkbox" id="slow"> медленная озвучка</label>
+    <label><input type="checkbox" id="hideRu"> скрыть транскрипцию</label>
+  </div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" data-tab="say" aria-selected="true">Говорить</button>
+    <button class="tab" role="tab" data-tab="hear" aria-selected="false">Понимать персонал</button>
+  </div>
+
+  <div id="noSpeech" class="warn hidden">Этот браузер не умеет распознавать речь. Проверка произношения работает в Chrome (Android/ПК) и Safari (iPhone). Озвучка и тренировка на слух работают везде.</div>
+  <div id="noVoice" class="warn hidden">Не найден японский голос для озвучки. На iPhone: Настройки → Универсальный доступ → Устный контент → Голоса → Японский.</div>
+
+  <main id="say"></main>
+  <main id="hear" class="hidden"></main>
+</div>
+
+<script>
+// ---------- Данные сценария ----------
+// accept — варианты написания, которые может выдать распознавание (кандзи/кана).
+const SAY = [
+  {section:"Вход и ресепшн", items:[
+    {id:"konbanwa", jp:"こんばんは", kana:"こんばんは", romaji:"konbanwa", ru:"комбанва", meaning:"Добрый вечер", accept:["こんばんは","今晩は","こんばんわ"]},
+    {id:"hajimete", jp:"初めてです", kana:"はじめてです", romaji:"hajimete desu", ru:"хадзимэтэ дэс", meaning:"Я здесь впервые", note:"Скорее всего, тебя спросят 初めてですか？ — это ответ.", accept:["初めてです","はじめてです"]},
+    {id:"hitori", jp:"一人です", kana:"ひとりです", romaji:"hitori desu", ru:"хитори дэс", meaning:"Я один", accept:["一人です","1人です","ひとりです","独りです"]},
+    {id:"futari", jp:"二人です", kana:"ふたりです", romaji:"futari desu", ru:"футари дэс", meaning:"Нас двое (пара)", note:"Пары часто платят меньше одиночных мужчин.", accept:["二人です","2人です","ふたりです"]},
+    {id:"sukoshi", jp:"日本語は少しだけ話せます", kana:"にほんごはすこしだけはなせます", romaji:"nihongo wa sukoshi dake hanasemasu", ru:"нихонго ва сукоси дакэ ханасэмас", meaning:"Я говорю по-японски совсем немного", accept:["日本語は少しだけ話せます","日本語は少しだけはなせます","にほんごはすこしだけはなせます"]},
+    {id:"yukkuri", jp:"ゆっくり話してください", kana:"ゆっくりはなしてください", romaji:"yukkuri hanashite kudasai", ru:"юккури ханаситэ кудасай", meaning:"Говорите, пожалуйста, медленнее", accept:["ゆっくり話してください","ゆっくりはなしてください","ゆっくり話して下さい"]},
+    {id:"mouichido", jp:"もう一度お願いします", kana:"もういちどおねがいします", romaji:"mou ichido onegai shimasu", ru:"мо: итидо онэгай симас", meaning:"Повторите, пожалуйста", accept:["もう一度お願いします","もういちどおねがいします","もう1度お願いします"]},
+    {id:"passport", jp:"パスポートでいいですか", kana:"ぱすぽーとでいいですか", romaji:"pasupōto de ii desu ka", ru:"пасупо:то дэ ий дэс ка", meaning:"Паспорт подойдёт?", note:"Без документа не впустят почти нигде.", accept:["パスポートでいいですか","パスポートでいいですか?"]},
+    {id:"ryoukin", jp:"料金はいくらですか", kana:"りょうきんはいくらですか", romaji:"ryōkin wa ikura desu ka", ru:"рё:кин ва икура дэс ка", meaning:"Сколько стоит вход?", accept:["料金はいくらですか","りょうきんはいくらですか","料金は幾らですか"]},
+    {id:"card", jp:"カードは使えますか", kana:"かーどはつかえますか", romaji:"kādo wa tsukaemasu ka", ru:"ка:до ва цукаэмас ка", meaning:"Картой можно?", accept:["カードは使えますか","カードはつかえますか"]},
+    {id:"rules", jp:"ルールを教えてください", kana:"るーるをおしえてください", romaji:"rūru o oshiete kudasai", ru:"ру:ру о осиэтэ кудасай", meaning:"Расскажите, пожалуйста, правила", accept:["ルールを教えてください","ルールをおしえてください","ルールを教えて下さい"]},
+    {id:"wakarimashita", jp:"わかりました", kana:"わかりました", romaji:"wakarimashita", ru:"вакаримасита", meaning:"Понятно / Понял", accept:["わかりました","分かりました","解りました"]},
+  ]},
+  {section:"Бар и знакомство", items:[
+    {id:"beer", jp:"ビールをお願いします", kana:"びーるをおねがいします", romaji:"bīru o onegai shimasu", ru:"би:ру о онэгай симас", meaning:"Пиво, пожалуйста", note:"Вместо ビール подставь любой напиток: ハイボール (хайбо:ру), お茶 (отя).", accept:["ビールをお願いします","ビールおねがいします","ビールをおねがいします","ビールお願いします"]},
+    {id:"kanpai", jp:"乾杯", kana:"かんぱい", romaji:"kanpai", ru:"кампай", meaning:"За здоровье!", accept:["乾杯","かんぱい","カンパイ"]},
+    {id:"hajimemashite", jp:"はじめまして", kana:"はじめまして", romaji:"hajimemashite", ru:"хадзимэмаситэ", meaning:"Приятно познакомиться (при первой встрече)", accept:["はじめまして","初めまして"]},
+    {id:"roshia", jp:"ロシアから来ました", kana:"ろしあからきました", romaji:"roshia kara kimashita", ru:"росиа кара кимасита", meaning:"Я из России", accept:["ロシアから来ました","ロシアからきました"]},
+    {id:"yoroshiku", jp:"よろしくお願いします", kana:"よろしくおねがいします", romaji:"yoroshiku onegai shimasu", ru:"ёросику онэгай симас", meaning:"Рад знакомству (вежливое «будем знакомы»)", accept:["よろしくお願いします","宜しくお願いします","よろしくおねがいします"]},
+    {id:"tonari", jp:"隣に座ってもいいですか", kana:"となりにすわってもいいですか", romaji:"tonari ni suwatte mo ii desu ka", ru:"тонари ни суваттэ мо ий дэс ка", meaning:"Можно сесть рядом?", accept:["隣に座ってもいいですか","となりにすわってもいいですか","隣に座ってもいいですか?"]},
+    {id:"yokukimasu", jp:"よく来ますか", kana:"よくきますか", romaji:"yoku kimasu ka", ru:"ёку кимас ка", meaning:"Часто сюда приходите?", accept:["よく来ますか","よくきますか"]},
+    {id:"nanika", jp:"何か飲みますか", kana:"なにかのみますか", romaji:"nanika nomimasu ka", ru:"наника номимас ка", meaning:"Хотите что-нибудь выпить?", accept:["何か飲みますか","なにか飲みますか","なにかのみますか"]},
+  ]},
+  {section:"Границы и согласие", items:[
+    {id:"sawatte", jp:"触ってもいいですか", kana:"さわってもいいですか", romaji:"sawatte mo ii desu ka", ru:"саваттэ мо ий дэс ка", meaning:"Можно прикоснуться?", note:"Спрашивать явно — норма. Без согласия = выгонят.", accept:["触ってもいいですか","さわってもいいですか"]},
+    {id:"daijoubuka", jp:"大丈夫ですか", kana:"だいじょうぶですか", romaji:"daijōbu desu ka", ru:"дайдзё:бу дэс ка", meaning:"Тебе нормально? Всё в порядке?", accept:["大丈夫ですか","だいじょうぶですか"]},
+    {id:"hanasudake", jp:"今日は話すだけにします", kana:"きょうははなすだけにします", romaji:"kyō wa hanasu dake ni shimasu", ru:"кё: ва ханасу дакэ ни симас", meaning:"Сегодня я только пообщаюсь", accept:["今日は話すだけにします","きょうは話すだけにします","今日ははなすだけにします"]},
+    {id:"chotto", jp:"ごめんなさい、ちょっと…", kana:"ごめんなさい、ちょっと", romaji:"gomen nasai, chotto…", ru:"гомэн насай, тётто…", meaning:"Извините, я, пожалуй, нет… (мягкий отказ)", note:"Японский отказ — недосказанность. Если тебе ответили ちょっと… — это «нет», не дави.", accept:["ごめんなさいちょっと","ごめんなさい、ちょっと","ごめんなさいちょっと…"]},
+    {id:"daijoubu", jp:"大丈夫です、ありがとう", kana:"だいじょうぶです、ありがとう", romaji:"daijōbu desu, arigatō", ru:"дайдзё:бу дэс, аригато:", meaning:"Нет, спасибо (вежливо)", note:"Ловушка: 大丈夫です значит и «всё ок», и «не надо». Смысл — по контексту и тону.", accept:["大丈夫ですありがとう","大丈夫です、ありがとう","だいじょうぶですありがとう"]},
+    {id:"yamete", jp:"やめてください", kana:"やめてください", romaji:"yamete kudasai", ru:"ямэтэ кудасай", meaning:"Прекратите, пожалуйста (твёрдо)", accept:["やめてください","止めてください","やめて下さい"]},
+  ]},
+  {section:"Уход", items:[
+    {id:"kaikei", jp:"お会計お願いします", kana:"おかいけいおねがいします", romaji:"okaikei onegai shimasu", ru:"окайкэй онэгай симас", meaning:"Счёт, пожалуйста", accept:["お会計お願いします","お会計おねがいします","おかいけいおねがいします"]},
+    {id:"tanoshikatta", jp:"楽しかったです", kana:"たのしかったです", romaji:"tanoshikatta desu", ru:"таносикатта дэс", meaning:"Было весело", accept:["楽しかったです","たのしかったです"]},
+    {id:"arigatou", jp:"ありがとうございました", kana:"ありがとうございました", romaji:"arigatō gozaimashita", ru:"аригато: годзаимасита", meaning:"Большое спасибо", accept:["ありがとうございました","有難うございました"]},
+    {id:"matakimasu", jp:"また来ます", kana:"またきます", romaji:"mata kimasu", ru:"мата кимас", meaning:"Ещё приду", accept:["また来ます","またきます"]},
+  ]},
+];
+
+// Фразы, которые скажет персонал: нужно понять на слух.
+const HEAR = [
+  {jp:"初めてですか？", ru:"хадзимэтэ дэс ка", meaning:"Вы здесь впервые?"},
+  {jp:"身分証を見せてください。", ru:"мибунсё: о мисэтэ кудасай", meaning:"Покажите документ, пожалуйста"},
+  {jp:"会員登録が必要です。", ru:"кайин то:року га хицуё: дэс", meaning:"Нужна регистрация (членство)"},
+  {jp:"撮影は禁止です。", ru:"сацуэй ва кинси дэс", meaning:"Фото и видео запрещены"},
+  {jp:"スマホはロッカーに入れてください。", ru:"сумахо ва рокка: ни ирэтэ кудасай", meaning:"Уберите телефон в шкафчик"},
+  {jp:"無理強いは禁止です。", ru:"муридзи: ва кинси дэс", meaning:"Принуждать кого-либо запрещено"},
+  {jp:"お声がけはスタッフを通してください。", ru:"окоэгакэ ва сутаффу о то:ситэ кудасай", meaning:"Знакомиться — через персонал"},
+  {jp:"何を飲みますか？", ru:"нани о номимас ка", meaning:"Что будете пить?"},
+  {jp:"日本語は話せますか？", ru:"нихонго ва ханасэмас ка", meaning:"Вы говорите по-японски?"},
+  {jp:"申し訳ありませんが、外国の方はお断りしています。", ru:"мо:сивакэ аримасэн га, гайкоку но ката ва окотовари ситэ имас", meaning:"Простите, иностранцев не принимаем"},
+  {jp:"ラストオーダーです。", ru:"расуто о:да: дэс", meaning:"Последний заказ"},
+  {jp:"またお越しください。", ru:"мата окоси кудасай", meaning:"Приходите ещё"},
+];
+
+// ---------- Утилиты ----------
+const $ = (s, el=document) => el.querySelector(s);
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; }catch{ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} },
+};
+const best = store.get("jp-best", {});
+
+function normalize(s){
+  return s.normalize("NFKC")
+    .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60)) // катакана → хирагана
+    .replace(/[\s、。，．,.!?！？…・「」『』"']/g, "")
+    .toLowerCase();
+}
+function levenshtein(a, b){
+  const m = a.length, n = b.length;
+  let prev = Array.from({length:n+1}, (_, j) => j);
+  for(let i=1;i<=m;i++){
+    const cur = [i];
+    for(let j=1;j<=n;j++){
+      cur[j] = Math.min(prev[j]+1, cur[j-1]+1, prev[j-1] + (a[i-1]===b[j-1]?0:1));
+    }
+    prev = cur;
+  }
+  return prev[n];
+}
+function similarity(heard, targets){
+  const h = normalize(heard);
+  let top = 0;
+  for(const t of targets){
+    const n = normalize(t);
+    if(!n.length) continue;
+    top = Math.max(top, 1 - levenshtein(h, n) / Math.max(h.length, n.length));
+  }
+  return top;
+}
+
+// ---------- Озвучка ----------
+let jaVoice = null;
+function pickVoice(){
+  const vs = speechSynthesis.getVoices();
+  jaVoice = vs.find(v => v.lang === "ja-JP" && /kyoko|otoya|google/i.test(v.name)) || vs.find(v => v.lang?.startsWith("ja")) || null;
+  $("#noVoice").classList.toggle("hidden", !!jaVoice || !vs.length);
+}
+if("speechSynthesis" in window){
+  pickVoice();
+  speechSynthesis.onvoiceschanged = pickVoice;
+}
+function speak(text){
+  if(!("speechSynthesis" in window)) return;
+  speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = "ja-JP";
+  if(jaVoice) u.voice = jaVoice;
+  u.rate = $("#slow").checked ? 0.65 : 0.95;
+  speechSynthesis.speak(u);
+}
+
+// ---------- Распознавание ----------
+const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+if(!SR) $("#noSpeech").classList.remove("hidden");
+let activeRec = null;
+
+function listen(item, btn, out){
+  if(activeRec){ activeRec.abort(); return; }
+  speechSynthesis?.cancel();
+  const rec = new SR();
+  rec.lang = "ja-JP";
+  rec.interimResults = false;
+  rec.maxAlternatives = 5;
+  activeRec = rec;
+  btn.classList.add("rec"); btn.textContent = "Слушаю… (стоп)";
+  let got = false;
+
+  rec.onresult = e => {
+    got = true;
+    const alts = Array.from(e.results[0]).map(a => a.transcript);
+    let score = 0, heard = alts[0];
+    for(const a of alts){
+      const s = similarity(a, item.accept.concat(item.jp, item.kana));
+      if(s > score){ score = s; heard = a; }
+    }
+    showResult(item, out, score, heard);
+  };
+  rec.onerror = e => {
+    const msg = e.error === "not-allowed" ? "Нет доступа к микрофону — разреши его в настройках браузера."
+      : e.error === "no-speech" ? "Ничего не услышал. Говори сразу после нажатия."
+      : e.error === "aborted" ? "" : "Ошибка распознавания: " + e.error;
+    if(msg){ out.className = "result bad"; out.textContent = msg; }
+  };
+  rec.onend = () => {
+    activeRec = null;
+    btn.classList.remove("rec"); btn.textContent = "🎤 Повторить";
+    if(!got && !out.textContent){ out.className = "result bad"; out.textContent = "Ничего не распознано, попробуй ещё раз."; }
+  };
+  out.className = "result"; out.textContent = "";
+  rec.start();
+}
+
+function showResult(item, out, score, heard){
+  const pct = Math.round(score * 100);
+  const [cls, verdict] = pct >= 85 ? ["ok", "Тебя поймут"] : pct >= 60 ? ["mid", "Почти — послушай ещё раз и повтори"] : ["bad", "Пока не узнаётся"];
+  out.className = "result " + cls;
+  out.innerHTML = "";
+  const line1 = document.createElement("div");
+  line1.innerHTML = `<span class="score">${pct}%</span> · ${verdict}`;
+  const line2 = document.createElement("div");
+  line2.textContent = "Распознано: " + heard;
+  out.append(line1, line2);
+  if(pct > (best[item.id] || 0)){
+    best[item.id] = pct; store.set("jp-best", best);
+    const b = document.querySelector(`[data-best="${item.id}"]`);
+    if(b) b.textContent = "лучший: " + pct + "%";
+  }
+}
+
+// ---------- Рендер: Говорить ----------
+function renderSay(){
+  const root = $("#say");
+  for(const sec of SAY){
+    const h = document.createElement("div");
+    h.className = "section-title"; h.textContent = sec.section;
+    root.append(h);
+    for(const it of sec.items){
+      const c = document.createElement("div");
+      c.className = "card";
+      c.innerHTML = `
+        <div class="jp"></div>
+        <div class="kana"></div>
+        <div class="rd"><b class="ru"></b> <span class="kana romaji"></span></div>
+        <div class="meaning"></div>
+        ${it.note ? '<div class="note"></div>' : ""}
+        <div class="row">
+          <button class="btn play">🔊 Послушать</button>
+          <button class="btn primary mic">🎤 Повторить</button>
+          <span class="best" data-best="${it.id}"></span>
+        </div>
+        <div class="result"></div>`;
+      $(".jp", c).textContent = it.jp;
+      $(".kana", c).textContent = it.kana !== it.jp ? it.kana : "";
+      $(".ru", c).textContent = it.ru;
+      $(".romaji", c).textContent = it.romaji;
+      $(".meaning", c).textContent = it.meaning;
+      if(it.note) $(".note", c).textContent = it.note;
+      if(best[it.id]) $(".best", c).textContent = "лучший: " + best[it.id] + "%";
+      $(".play", c).onclick = () => speak(it.jp);
+      const mic = $(".mic", c);
+      if(!SR) mic.disabled = true;
+      mic.onclick = () => listen(it, mic, $(".result", c));
+      root.append(c);
+    }
+  }
+}
+
+// ---------- Рендер: Понимать ----------
+function shuffle(a){ a = a.slice(); for(let i=a.length-1;i>0;i--){ const j = Math.floor(Math.random()*(i+1)); [a[i],a[j]] = [a[j],a[i]]; } return a; }
+let hearScore = {right:0, total:0};
+function renderHear(){
+  const root = $("#hear");
+  root.innerHTML = "";
+  const intro = document.createElement("div");
+  intro.className = "warn";
+  intro.textContent = `Персонал объясняет правила быстро. Нажми «Послушать» и выбери перевод, не подглядывая. Счёт: ${hearScore.right}/${hearScore.total}`;
+  root.append(intro);
+
+  const q = HEAR[Math.floor(Math.random() * HEAR.length)];
+  const wrong = shuffle(HEAR.filter(x => x !== q)).slice(0, 3);
+  const c = document.createElement("div");
+  c.className = "card";
+  c.innerHTML = `
+    <div class="row" style="margin-top:0">
+      <button class="btn primary play">🔊 Послушать</button>
+      <button class="btn reveal">Показать текст</button>
+    </div>
+    <div class="text hidden" style="margin-top:12px"><div class="jp"></div><div class="rd"><b class="ru"></b></div></div>
+    <div class="opts"></div>
+    <div class="row next-row hidden"><button class="btn primary next">Дальше →</button></div>`;
+  $(".jp", c).textContent = q.jp;
+  $(".ru", c).textContent = q.ru;
+  $(".play", c).onclick = () => speak(q.jp);
+  $(".reveal", c).onclick = () => $(".text", c).classList.remove("hidden");
+  $(".next", c).onclick = renderHear;
+  const opts = $(".opts", c);
+  let answered = false;
+  for(const o of shuffle([q, ...wrong])){
+    const b = document.createElement("button");
+    b.className = "opt"; b.textContent = o.meaning;
+    b.onclick = () => {
+      if(answered) return;
+      answered = true;
+      hearScore.total++;
+      if(o === q) hearScore.right++;
+      b.classList.add(o === q ? "right" : "wrong");
+      [...opts.children].find(x => x.textContent === q.meaning).classList.add("right");
+      $(".text", c).classList.remove("hidden");
+      $(".next-row", c).classList.remove("hidden");
+      intro.textContent = intro.textContent.replace(/Счёт: .*/, `Счёт: ${hearScore.right}/${hearScore.total}`);
+    };
+    opts.append(b);
+  }
+  root.append(c);
+  setTimeout(() => speak(q.jp), 150);
+}
+
+// ---------- Переключатели ----------
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => {
+  document.querySelectorAll(".tab").forEach(x => x.setAttribute("aria-selected", x === t));
+  $("#say").classList.toggle("hidden", t.dataset.tab !== "say");
+  $("#hear").classList.toggle("hidden", t.dataset.tab !== "hear");
+  if(t.dataset.tab === "hear" && !$("#hear").children.length) renderHear();
+  store.set("jp-tab", t.dataset.tab);
+});
+const hideRu = $("#hideRu");
+hideRu.checked = store.get("jp-hide-ru", false);
+const applyHide = () => document.querySelectorAll(".rd, .card > .kana").forEach(e => e.style.visibility = hideRu.checked ? "hidden" : "");
+hideRu.onchange = () => { store.set("jp-hide-ru", hideRu.checked); applyHide(); };
+$("#slow").checked = store.get("jp-slow", false);
+$("#slow").onchange = e => store.set("jp-slow", e.target.checked);
+
+renderSay();
+applyHide();
+if(store.get("jp-tab", "say") === "hear") document.querySelector('[data-tab="hear"]').click();
+</script>
+</body>
+</html>
